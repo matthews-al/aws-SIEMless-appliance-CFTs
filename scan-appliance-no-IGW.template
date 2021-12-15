@@ -108,67 +108,67 @@
     "Mappings": {
         "AWSRegionAMI": {
             "us-east-1": {
-                "US": "ami-08076977",
-                "UK": "ami-08076977"
+                "US": "ami-0b35743e831becad1",
+                "UK": "ami-0b35743e831becad1"
             },
             "us-east-2": {
-                "US": "ami-96704ff3",
-                "UK": "ami-96704ff3"
+                "US": "ami-00d46562af87f9209",
+                "UK": "ami-00d46562af87f9209"
             },
             "us-west-2": {
-                "US": "ami-928ef5ea",
-                "UK": "ami-928ef5ea"
+                "US": "ami-01651323b6338e70b",
+                "UK": "ami-01651323b6338e70b"
             },
             "us-west-1": {
-                "US": "ami-d08e95b0",
-                "UK": "ami-d08e95b0"
+                "US": "ami-02db305d04e11d40b",
+                "UK": "ami-02db305d04e11d40b"
             },
             "eu-west-1": {
-                "US": "ami-05764c7c",
-                "UK": "ami-05764c7c"
+                "US": "ami-0fca75afdd4b43b58",
+                "UK": "ami-0fca75afdd4b43b58"
             },
             "eu-west-2": {
-                "US": "ami-9505e9f2",
-                "UK": "ami-9505e9f2"
+                "US": "ami-0cccfea5d111b17f4",
+                "UK": "ami-0cccfea5d111b17f4"
             },
             "eu-west-3": {
-                "US": "ami-555dec28",
-                "UK": "ami-555dec28"
+                "US": "ami-0472090cd7e0b2d9e",
+                "UK": "ami-0472090cd7e0b2d9e"
             },
             "eu-central-1": {
-                "US": "ami-a54b7e4e",
-                "UK": "ami-a54b7e4e"
+                "US": "ami-075f103b9b7d6c2fe",
+                "UK": "ami-075f103b9b7d6c2fe"
             },
             "ap-northeast-1": {
-                "US": "ami-e951a996",
-                "UK": "ami-e951a996"
+                "US": "ami-00f06755223327782",
+                "UK": "ami-00f06755223327782"
             },
             "ap-northeast-2": {
-                "US": "ami-9fbe15f1",
-                "UK": "ami-9fbe15f1"
+                "US": "ami-02914a21d67a3d422",
+                "UK": "ami-02914a21d67a3d422"
             },
             "ap-southeast-1": {
-                "US": "ami-f986b985",
-                "UK": "ami-f986b985"
+                "US": "ami-06007137c7dad1ef6",
+                "UK": "ami-06007137c7dad1ef6"
             },
             "ap-southeast-2": {
-                "US": "ami-eb8f5d89",
-                "UK": "ami-eb8f5d89"
+                "US": "ami-02910709a8a3d1d40",
+                "UK": "ami-02910709a8a3d1d40"
             },
             "ap-south-1": {
-                "US": "ami-92b996fd",
-                "UK": "ami-92b996fd"
+                "US": "ami-01497ed57020df9a1",
+                "UK": "ami-01497ed57020df9a1"
             },
             "sa-east-1": {
-                "US": "ami-e5e4ba89",
-                "UK": "ami-e5e4ba89"
+                "US": "ami-09f538166c4483f6c",
+                "UK": "ami-09f538166c4483f6c"
             },
             "ca-central-1": {
-                "US": "ami-40e46724",
-                "UK": "ami-40e46724"
+                "US": "ami-06ff0915aea36b0c5",
+                "UK": "ami-06ff0915aea36b0c5"
             }
         },
-        "StackVaporator": {
+        "Vaporators": {
             "US": {
                 "host": "agentapi.cloudinsight.alertlogic.com",
                 "port": "443"
@@ -278,144 +278,34 @@
                 },
                 "UserData": {
                     "Fn::Base64": {
-                        "Fn::Join": [
-                            "",
-                            [
-                                "#!/bin/sh\n\n",
-                                "log()\n{\n",
-                                "    echo \"al-bootstrap: $1\" > /dev/console\n",
-                                "    logger -tal-bootstrap $1\n",
-                                "}\n\n",
-                                "setup_environment()\n{\n",
-                                "    log \"Setting up environment\"\n",
-                                "    CRON_FILE='/etc/cron.d/alertlogic'\n",
-                                "    VAPORATOR_HOST='",
-                                {
+                        "Fn::Sub": [
+                            "{\n    \"vaporator_host\": \"${VaporatorHost}\",\n    \"vaporator_port\": ${VaporatorPort},\n    \"account_id\": \"${AccountId}\",\n    \"environment_id\": \"${EnvironmentId}\"\n}",
+                            {
+                                "VaporatorHost": {
                                     "Fn::FindInMap": [
-                                        "StackVaporator",
+                                        "Vaporators",
                                         {
                                             "Ref": "Stack"
                                         },
                                         "host"
                                     ]
                                 },
-                                "'\n",
-                                "    VAPORATOR_PORT='",
-                                {
+                                "VaporatorPort": {
                                     "Fn::FindInMap": [
-                                        "StackVaporator",
+                                        "Vaporators",
                                         {
                                             "Ref": "Stack"
                                         },
                                         "port"
                                     ]
                                 },
-                                "'\n",
-                                "    ACCOUNT_ID='",
-                                {
+                                "AccountId": {
                                     "Ref": "AccountId"
                                 },
-                                "'\n",
-                                "    ENVIRONMENT_ID='",
-                                {
+                                "DeploymentId": {
                                     "Ref": "EnvironmentId"
-                                },
-                                "'\n",
-                                "    CRT='/var/alertlogic/etc/provisioning.crt'\n",
-                                "    KEY='/var/alertlogic/etc/provisioning.key'\n",
-                                "    BOOTSTRAP_SH='/var/alertlogic/bin/bootstrap.sh'\n",
-                                "    BOOTSTRAP_PY='/var/alertlogic/bin/bootstrap.py'\n",
-                                "    ACCOUNT_FILE='/var/alertlogic/etc/account_id'\n",
-                                "    ENVIRONMENT_FILE='/var/alertlogic/etc/environment_id'\n",
-                                "    MONIT_CONFIG='/etc/monit.d/alertlogic'\n\n",
-                                "    NET_CONFIG='/etc/sysconfig/network-scripts/ifcfg-eth0'\n",
-                                "    DNS1='8.8.8.8'\n",
-                                "    DNS2='8.8.4.4'\n\n",
-                                "    mkdir -p /var/alertlogic/bin\n",
-                                "    mkdir -p /var/alertlogic/etc\n",
-                                "    mkdir -p /etc/monit.d\n",
-                                "    echo -n \"$ACCOUNT_ID\" > $ACCOUNT_FILE\n",
-                                "    echo -n \"$ENVIRONMENT_ID\" > $ENVIRONMENT_FILE\n",
-                                "}\n\n",
-                                "prepare_bootstrap_script()\n{\n",
-                                "    log \"Preparing bootstrap script $BOOTSTRAP_SH\"\n",
-                                "    cat > $BOOTSTRAP_SH << EOF\n",
-                                "#!/bin/bash\n\n",
-                                "curl \\\\\n",
-                                "        --cert $CRT \\\\\n",
-                                "        --key $KEY \\\\\n",
-                                "        --insecure \\\\\n",
-                                "        -o $BOOTSTRAP_PY \\\\\n",
-                                "        https://$VAPORATOR_HOST:$VAPORATOR_PORT/launcher/v1/deployment/script\n\n",
-                                "if [ \\$? -eq 0 ]; then\n",
-                                "    chmod 0755 $BOOTSTRAP_PY\n\n",
-                                "    $BOOTSTRAP_PY $VAPORATOR_HOST $VAPORATOR_PORT\n\n",
-                                "    if [ \\$? -eq 0 ]; then\n",
-                                "        rm -f $CRON_FILE\n\n",
-                                "        exit 0\n",
-                                "    fi\n",
-                                "fi\n\n",
-                                "exit 1\n",
-                                "EOF\n",
-                                "    chmod 0755 $BOOTSTRAP_SH\n",
-                                "}\n\n",
-                                "configure_external_dns()\n{\n",
-                                "    log \"Configuring external DNS($DNS1, $DNS2) to be used by the instance\"\n",
-                                "    sed -i '/PEERDNS.*/d' $NET_CONFIG\n\n",
-                                "    cat >> $NET_CONFIG << EOF\nPEERDNS=no\nEOF\n\n",
-                                "    cat > /etc/resolv.conf << EOF\nnameserver $DNS1\nnameserver $DNS2\nEOF\n",
-                                "}\n\n",
-                                "probe_external_dns()\n{\n",
-                                "    log \"Probing external DNS\"\n",
-                                "    nslookup $VAPORATOR_HOST $DNS1\n",
-                                "}\n\n",
-                                "configure_dns()\n{\n",
-                                "    log \"Verifying DNS configuration\"\n",
-                                "    while true\n",
-                                "    do\n",
-                                "        if nslookup $VAPORATOR_HOST\n",
-                                "        then\n",
-                                "            log \"Current DNS configuration is okay $VAPORATOR_HOST resolved\"\n",
-                                "            break\n",
-                                "        else\n",
-                                "            log \"Current DNS configuration FAILED to resolve $VAPORATOR_HOST\"\n",
-                                "        fi\n",
-                                "        if probe_external_dns\n",
-                                "        then\n",
-                                "            log \"External DNS resolved $VAPORATOR_HOST\"\n",
-                                "            configure_external_dns\n",
-                                "        else\n",
-                                "            log \"External DNS FAILED to resolve $VAPORATOR_HOST\"\n",
-                                "        fi\n",
-                                "    done\n",
-                                "}\n\n",
-                                "setup_cron_job()\n{\n",
-                                "    log \"Setting up cron job\"\n",
-                                "    echo \"* * * * * root $BOOTSTRAP_SH\" > $CRON_FILE\n",
-                                "}\n\n",
-                                "setup_monit()\n{\n",
-                                "    log \"Setting up monit\"\n",
-                                "        cat > $MONIT_CONFIG << EOF\n",
-                                "# Alert Logic Monit settings\n",
-                                "#\n",
-                                "# If scan appliance dies then restart it\n",
-                                "#\n",
-                                "check process al-scan-remote with pidfile /var/alertlogic/lib/scan-remote/run/al-scanappliance-remote.pid\n",
-                                "  start program = \"/etc/init.d/al-scan-remote start\"\n",
-                                "#\n",
-                                "# If the root filesystem fills up then stop the scan appliance\n",
-                                "#\n",
-                                "check filesystem rootfs with path /dev/disk/by-label/root\n",
-                                "  if space usage > 80% then exec \"/bin/bash -c '/sbin/shutdown -h now'\"\n",
-                                "EOF\n",
-                                "}\n\n",
-                                "setup_environment\n",
-                                "prepare_bootstrap_script\n",
-                                "configure_dns\n",
-                                "setup_cron_job\n",
-                                "setup_monit\n\n",
-                                "exit 0\n"
-                            ]
+                                }
+                            }
                         ]
                     }
                 }
@@ -774,7 +664,7 @@
                     [
                         {
                             "Fn::FindInMap": [
-                                "StackVaporator",
+                                "Vaporators",
                                 {
                                     "Ref": "Stack"
                                 },
@@ -783,7 +673,7 @@
                         },
                         {
                             "Fn::FindInMap": [
-                                "StackVaporator",
+                                "Vaporators",
                                 {
                                     "Ref": "Stack"
                                 },
