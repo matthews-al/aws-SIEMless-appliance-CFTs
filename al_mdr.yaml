@@ -1,0 +1,163 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Setup AlertLogic MDR protection for one VPC.   This template
+  includes both the IDS and the Scan appliances.'
+Parameters:
+  AccountId:
+    Description: Enter your AlertLogic account ID.
+    Type: String
+    AllowedPattern: "^[1-9][0-9]*$"
+    ConstraintDescription: must be a valid AlertLogic account ID
+  DatacenterLocation:
+    Description: Select AlertLogic data center location
+    Type: String
+    Default: US
+    AllowedValues:
+    - US
+    - UK
+    - Integration
+    ConstraintDescription: must be a valid AlertLogic data center location
+  VpcId:
+    Description: Select a target VPC to deploy security infrastructure.
+    Type: AWS::EC2::VPC::Id
+    ConstraintDescription: must be a valid VPC ID
+  VpcCidr:
+    Description: 'This CIDR range allows agents to connect to the IDS appliances.   By default, it should match the CIDR
+       of the protected VPC above, but may need to be adjusted if VPC peering is in use.'
+    Type: String
+    AllowedPattern: "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}/[0-9]{1,2}$"
+    ConstraintDescription: must be a valid CIDR
+  SubnetId:
+    Description: 'Select the target subnets.  The autoscaling group will be able to launch appliances in each subnet listed.
+        Adding a subnet from each availablity zone in use will enable the IDS appliance to be scaled across AZs if needed.
+        Note - Subnets selected must all be either Public or Private.   They cannot be mixed.'
+    Type: List<AWS::EC2::Subnet::Id>
+    ConstraintDescription: must be a valid existing subnet ID list
+  AssignPublicIp:
+    Type: String
+    Description: If the selected subnets are Public (internet gateway), set this to true.   Otherwise select false.
+    Default: 'true'
+    AllowedValues:
+    - 'true'
+    - 'false'
+  IDSType:
+    Description: Select the instance type for the IDS security appliance(s)
+    Type: String
+    Default: c5.large
+    AllowedValues:
+    - m4.large
+    - m4.xlarge
+    - m4.2xlarge
+    - m5.large
+    - m5.xlarge
+    - m5.2xlarge
+    - c4.large
+    - c4.xlarge
+    - c4.2xlarge
+    - c5.large
+    - c5.xlarge
+    - c5.2xlarge
+    ConstraintDescription: must be a valid EC2 instance type
+  NumIDS:
+    Description: Enter a desired number of IDS appliance(s)
+    Type: Number
+    Default: '1'
+    MinValue: '0'
+    MaxValue: '10'
+    ConstraintDescription: must be an integer between 1 and 10
+  ScanType:
+    Description: Select the instance type for the Scan appliance(s)
+    Type: String
+    Default: c5.large
+    AllowedValues:
+    - t3.medium
+    - t3.large
+    - m4.large
+    - m4.xlarge
+    - m5.large
+    - m5.xlarge
+    - c4.large
+    - c4.xlarge
+    - c5.large
+    - c5.xlarge
+    ConstraintDescription: must be a valid EC2 instance type
+  NumScan:
+    Description: Enter a desired number of Scan appliances
+    Type: Number
+    Default: '1'
+    MinValue: '0'
+    MaxValue: '10'
+    ConstraintDescription: must be an integer between 1 and 10
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Alert Logic configuration
+      Parameters:
+      - AccountId
+      - DatacenterLocation
+    - Label:
+        default: Network Configuration
+      Parameters:
+      - VpcId
+      - VpcCidr
+      - SubnetId
+      - AssignPublicIp
+    - Label:
+        default: IDS configuration
+      Parameters:
+      - IDSType
+      - NumIDS
+    - Label:
+        default: Scan configuration
+      Parameters:
+      - ScanType
+      - NumScan
+    ParameterLabels:
+      AccountId:
+        default: Alert Logic Account ID
+      VpcId:
+        default: Target VPC
+      SubnetId:
+        default: Target Subnet ID
+      AssignPublicIp:
+        default: Assign Public IP
+      IDSType:
+        default: AWS instance type
+      NumIDS:
+        default: Number of IDS instances to deploy
+      ScanType:
+        default: AWS instance type
+      NumScan:
+        default: Number of Scan instances to deploy
+Resources:
+  IDSApplianceASG:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: http://cd.prod.manual-mode.repository.s3.amazonaws.com/cf_templates_latest/al_ids.yaml
+      Parameters:
+        AccountId: !Ref AccountId
+        VpcId: !Ref VpcId
+        VpcCidr: !Ref VpcCidr
+        SubnetId: !Join [ ', ', !Ref SubnetId ]
+        AssignPublicIp: !Ref AssignPublicIp
+        InstanceType: !Ref IDSType
+        NumAppliances: !Ref NumIDS
+      TimeoutInMinutes: '60'
+  ScanApplianceASG:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: http://cd.prod.manual-mode.repository.s3.amazonaws.com/cf_templates_latest/al_scan.yaml
+      Parameters:
+        AccountId: !Ref AccountId
+        DatacenterLocation: !Ref DatacenterLocation
+        VpcId: !Ref VpcId
+        VpcCidr: !Ref VpcCidr
+        SubnetId: !Join [ ', ', !Ref SubnetId ]
+        AssignPublicIp: !Ref AssignPublicIp
+        InstanceType: !Ref ScanType
+        NumAppliances: !Ref NumScan
+      TimeoutInMinutes: '60'
+Outputs:
+  AccountId:
+    Description: AlertLogic Account ID
+    Value: !Ref AccountId
