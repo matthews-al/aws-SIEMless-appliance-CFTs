@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: IAM Role to enable log collection from S3 bucket using deployment log sources
+Parameters:
+  ExternalId:
+    Type: String
+    MinLength: '2'
+    Description: >-
+      An external ID identifies Alert Logic as allowed access to the AWS
+      resources defined in this IAM Role.  This is typically the AlertLogic Customer ID
+  BucketName:
+    Type: String
+    Description: >-
+      S3 Bucket to collect logs from.
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: AlertLogicInfo
+      Parameters:
+      - ExternalId
+    - Label:
+        default: BucketInfo
+      Parameters:
+      - BucketName
+Outputs:
+  RoleARN:
+    Value: !GetAtt 
+      - ALS3SourceRole
+      - Arn
+    Description: Role ARN
+  ExternalId:
+    Value: !Ref ExternalId
+    Description: >-
+      An external ID identifies Alert Logic as allowed access to the AWS
+      resources defined in this IAM Role.
+Resources:
+  ALS3SourceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      Path: /alertlogic/
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Principal:
+              AWS: 'arn:aws:iam::239734009475:root'
+            Effect: Allow
+            Condition:
+              StringEquals:
+                'sts:ExternalId': !Ref ExternalId
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: ALIamPolicyS3
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Sid: GetLogFiles
+                Resource: !Sub 'arn:aws:s3:::${BucketName}/*'
+                Effect: Allow
+                Action:
+                  - 's3:GetObject'
+              - Sid: ListBucketContents
+                Resource: !Sub 'arn:aws:s3:::${BucketName}'
+                Effect: Allow
+                Action:
+                  - 's3:ListBucket'
