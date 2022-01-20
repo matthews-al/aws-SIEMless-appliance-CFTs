@@ -1,0 +1,224 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Create AlertLogic scan appliance infrastructure inside a VPC.
+  The artifacts created are:
+    - Security Group for the scan appliance
+    - Launch Template for the scan appliance
+    - Autoscaling group for the scan appliance'
+Parameters:
+  AccountId:
+    Description: Enter your AlertLogic account ID.
+    Type: String
+    AllowedPattern: "^[1-9][0-9]*$"
+    ConstraintDescription: must be a valid AlertLogic account ID
+  DatacenterLocation:
+    Description: Select AlertLogic data center location
+    Type: String
+    Default: US
+    AllowedValues:
+    - US
+    - UK
+    - Integration
+    ConstraintDescription: must be a valid AlertLogic data center location
+  VpcId:
+    Description: Select a target VPC to deploy security infrastructure.
+    Type: AWS::EC2::VPC::Id
+    ConstraintDescription: must be a valid VPC ID
+  VpcCidr:
+    Description: 'This CIDR range allows agents to connect to the IDS appliances.   By default, it should match the CIDR
+       of the protected VPC above, but may need to be adjusted if VPC peering is in use.'
+    Type: String
+    AllowedPattern: "^[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}/[0-9]{1,2}$"
+    ConstraintDescription: must be a valid CIDR
+  SubnetId:
+    Description: 'Select the target subnets.  The autoscaling group will be able to launch appliances in each subnet listed.
+        Adding a subnet from each availablity zone in use will enable the IDS appliance to be scaled across AZs if needed.
+        Note - Subnets selected must all be either Public or Private.   They cannot be mixed.'
+    Type: List<AWS::EC2::Subnet::Id>
+    ConstraintDescription: must be a valid existing subnet ID list
+  AssignPublicIp:
+    Type: String
+    Description: If the selected subnets are Public (internet gateway), set this to true.   Otherwise select false.
+    Default: 'true'
+    AllowedValues:
+    - 'true'
+    - 'false'
+  InstanceType:
+    Description: Select the instance type for the Scan appliance(s)
+    Type: String
+    Default: c5.large
+    AllowedValues:
+    - t3.medium
+    - t3.large
+    - m4.large
+    - m4.xlarge
+    - m5.large
+    - m5.xlarge
+    - c4.large
+    - c4.xlarge
+    - c5.large
+    - c5.xlarge
+    ConstraintDescription: must be a valid EC2 instance type
+  NumAppliances:
+    Description: Enter a desired number of scan appliances
+    Type: Number
+    Default: '1'
+    MaxValue: '10'
+    ConstraintDescription: must be an integer between 1 and 10
+Conditions:
+  AssignPublicIp:
+    Fn::Equals:
+    - 'true'
+    - Ref: AssignPublicIp
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Alert Logic configuration
+      Parameters:
+      - AccountId
+      - DatacenterLocation
+    - Label:
+        default: Network configuration
+      Parameters:
+      - VpcId
+      - VpcCidr
+      - SubnetId
+      - AssignPublicIp
+    - Label:
+        default: Scan appliances configuration
+      Parameters:
+      - InstanceType
+      - NumAppliances
+    ParameterLabels:
+      AccountId:
+        default: Alert Logic Account ID
+      DatacenterLocation:
+        default: Alert Logic DC location
+      VpcId:
+        default: Target VPC
+      VpcCidr:
+        default: Target VPC CIDR
+      InstanceType:
+        default: AWS instance type
+      NumAppliances:
+        default: Number of instances to deploy
+      AssignPublicIp:
+        default: Assign Public IP
+Mappings:
+  Internal:
+    Tags:
+      Version: v1.0.16m
+  'Fn::Transform':
+    Name: 'AWS::Include'
+    Parameters:
+      Location: s3://al-ms-cft-testing/scan_ami.json
+  Vaporators:
+    US:
+      host: agentapi.cloudinsight.alertlogic.com
+      port: '443'
+    UK:
+      host: agentapi.cloudinsight.alertlogic.co.uk
+      port: '443'
+    Integration:
+      host: agentapi.product.dev.alertlogic.com
+      port: '443'
+Resources:
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Sub 'AlertLogic-Scan-ASG-${AccountId}-${VpcId}-${AWS::StackName}'
+      VPCZoneIdentifier: !Ref SubnetId
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: !Ref NumAppliances
+      MaxSize: !Ref NumAppliances
+      DesiredCapacity: !Ref NumAppliances
+      Tags:
+      - Key: Name
+        Value: AlertLogic Security Appliance
+        PropagateAtLaunch: 'true'
+      - Key: AlertLogic-AccountID
+        Value: !Ref AccountId
+        PropagateAtLaunch: 'true'
+      - Key: AlertLogic
+        Value: Security
+        PropagateAtLaunch: 'true'
+      - Key: AlertLogic Scan Manual Mode Template Version
+        Value: !FindInMap [ Internal, Tags, Version ]
+        PropagateAtLaunch: 'true'
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub 'AlertLogic-Scan-Template-${AccountId}-${VpcId}-${AWS::StackName}'
+      LaunchTemplateData:
+        ImageId: !FindInMap [ RegionSettings, !Ref AWS::Region, ImageId ]
+        InstanceType: !Ref InstanceType
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            DeleteOnTermination: true
+            AssociatePublicIpAddress: !If [AssignPublicIp, 'true', 'false']
+            Groups: [ !Ref SecurityGroup ]
+        UserData:
+          Fn::Base64:
+            Fn::Sub:
+            - |-
+              {
+                  "vaporator_host": "${VaporatorHost}",
+                  "vaporator_port": ${VaporatorPort},
+                  "account_id": "${AccountId}"
+              }
+            - VaporatorHost: !FindInMap [ Vaporators, !Ref DatacenterLocation, host ]
+              VaporatorPort: !FindInMap [ Vaporators, !Ref DatacenterLocation, port ]
+              AccountId: !Ref AccountId
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VpcId
+      GroupName: !Sub 'AlertLogic Scan Security Group - ${AccountId}/${VpcId}/${AWS::StackName}'
+      GroupDescription: AlertLogic Scan Security Group
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        FromPort: '53'
+        ToPort: '53'
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: udp
+        FromPort: '53'
+        ToPort: '53'
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: '443'
+        ToPort: '443'
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: "-1"
+        FromPort: '0'
+        ToPort: '0'
+        CidrIp: !Ref VpcCidr
+      Tags:
+      - Key: Name
+        Value: !Sub 'AlertLogic Scan Security Group - ${AccountId}/${VpcId}/${AWS::StackName}'
+      - Key: AlertLogic-AccountID
+        Value: !Ref AccountId
+      - Key: AlertLogic
+        Value: Security
+      - Key: AlertLogic Scan Manual Mode Template Version
+        Value: !FindInMap [ Internal, Tags, Version ]
+Outputs:
+  AccountId:
+    Description: AlertLogic account ID
+    Value: !Ref AccountId
+  VpcId:
+    Description: ID of the protected VPC
+    Value: !Ref VpcId
+  NumAppliances:
+    Description: The number of created security appliances
+    Value: !Ref NumAppliances
+  SecurityGroupId:
+    Description: ID of the security group assigned to the security appliances
+    Value: !GetAtt SecurityGroup.GroupId
+  VaporatorHost:
+    Description: A vaporator host name for the selected AlertLogic data center
+    Value: !FindInMap [ Vaporators, !Ref DatacenterLocation, host ]
+  VaporatorPort:
+    Description: A vaporator port for the selected AlertLogic data center
+    Value: !FindInMap [ Vaporators, !Ref DatacenterLocation, port ]
